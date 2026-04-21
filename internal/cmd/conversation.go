@@ -10,8 +10,12 @@ import (
 )
 
 type ConversationCmd struct {
-	List ConversationListCmd `cmd:"" default:"1" help:"List conversations."`
-	View ConversationViewCmd `cmd:"" help:"View a conversation."`
+	List    ConversationListCmd    `cmd:"" default:"1" help:"List conversations."`
+	View    ConversationViewCmd    `cmd:"" help:"View a conversation."`
+	Close   ConversationCloseCmd   `cmd:"" help:"Resolve a conversation."`
+	Reopen  ConversationReopenCmd  `cmd:"" help:"Reopen a conversation."`
+	Pending ConversationPendingCmd `cmd:"" help:"Mark a conversation as pending."`
+	Snooze  ConversationSnoozeCmd  `cmd:"" help:"Snooze a conversation."`
 }
 
 type ConversationListCmd struct {
@@ -138,6 +142,60 @@ func (c *ConversationViewCmd) Run(app *App) error {
 		{Key: "Last Activity", Value: formatTimestamp(conv.LastActivityAt)},
 	})
 
+	return nil
+}
+
+type ConversationCloseCmd struct {
+	ID int `arg:"" help:"Conversation ID."`
+}
+
+func (c *ConversationCloseCmd) Run(app *App) error {
+	return runToggleStatus(app, c.ID, "resolved", nil)
+}
+
+type ConversationReopenCmd struct {
+	ID int `arg:"" help:"Conversation ID."`
+}
+
+func (c *ConversationReopenCmd) Run(app *App) error {
+	return runToggleStatus(app, c.ID, "open", nil)
+}
+
+type ConversationPendingCmd struct {
+	ID int `arg:"" help:"Conversation ID."`
+}
+
+func (c *ConversationPendingCmd) Run(app *App) error {
+	return runToggleStatus(app, c.ID, "pending", nil)
+}
+
+type ConversationSnoozeCmd struct {
+	ID       int           `arg:"" help:"Conversation ID."`
+	Duration time.Duration `help:"Snooze duration (e.g. 24h, 168h)." default:"24h"`
+}
+
+func (c *ConversationSnoozeCmd) Run(app *App) error {
+	until := time.Now().Add(c.Duration).Unix()
+	return runToggleStatus(app, c.ID, "snoozed", &until)
+}
+
+func runToggleStatus(app *App, id int, status string, snoozedUntil *int64) error {
+	resp, err := app.Client.Conversations().ToggleStatus(id, status, snoozedUntil)
+	if err != nil {
+		return err
+	}
+
+	if app.Printer.Format == "json" && !app.Printer.Quiet {
+		app.Printer.PrintJSON(resp)
+		return nil
+	}
+
+	if app.Printer.Quiet {
+		fmt.Println(resp.ConversationID)
+		return nil
+	}
+
+	fmt.Printf("Conversation %d: status → %s\n", resp.ConversationID, resp.CurrentStatus)
 	return nil
 }
 
