@@ -1,19 +1,25 @@
 package sdk
 
-import "fmt"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 type InboxesService struct {
 	client *Client
 }
 
 type InboxFull struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	ChannelType string `json:"channel_type"`
-	AvatarURL   string `json:"avatar_url"`
-	ChannelID   int    `json:"channel_id,omitempty"`
-	GreetingEnabled bool `json:"greeting_enabled"`
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	ChannelType     string `json:"channel_type"`
+	AvatarURL       string `json:"avatar_url"`
+	ChannelID       int    `json:"channel_id,omitempty"`
+	GreetingEnabled bool   `json:"greeting_enabled"`
 	GreetingMessage string `json:"greeting_message"`
+	WebhookURL      string `json:"webhook_url,omitempty"`
+	InboxIdentifier string `json:"inbox_identifier,omitempty"`
 }
 
 type InboxesListResponse struct {
@@ -31,6 +37,29 @@ func (s *InboxesService) List() (*InboxesListResponse, error) {
 func (s *InboxesService) Get(id int) (*InboxFull, error) {
 	var inbox InboxFull
 	if err := s.client.Get(fmt.Sprintf("/inboxes/%d", id), nil, &inbox); err != nil {
+		return nil, err
+	}
+	return &inbox, nil
+}
+
+type InboxChannel struct {
+	Type       string `json:"type"`
+	WebhookURL string `json:"webhook_url,omitempty"`
+}
+
+type CreateInboxRequest struct {
+	Name    string       `json:"name"`
+	Channel InboxChannel `json:"channel"`
+}
+
+func (s *InboxesService) Create(req CreateInboxRequest) (*InboxFull, error) {
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var inbox InboxFull
+	if err := s.client.Post("/inboxes", bytes.NewReader(jsonBody), &inbox); err != nil {
 		return nil, err
 	}
 	return &inbox, nil
